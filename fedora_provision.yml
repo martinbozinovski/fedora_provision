@@ -1,0 +1,87 @@
+---
+- name: Provision localhost Fedora
+  hosts: localhost
+  become: yes
+
+  tasks:
+    - name: manage docker (remove if old, install latest)
+      shell: | 
+        dnf remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux \
+                  docker-engine-selinux \
+                  docker-engine
+        dnf -y install dnf-plugins-core
+        dnf -y config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+        dnf -y install docker-ce docker-ce-cli containerd.io --allowerasing
+        dnf -y install docker-compose
+
+    - name: manage mongodb
+      block:
+        - name: create and populate mongodb.repo file
+          copy:
+            dest: "/etc/yum.repos.d/mongodb.repo"
+            content: |
+              [mongodb-org-4.4]
+              name=MongoDB Repository
+              baseurl=https://repo.mongodb.org/yum/redhat/8/mongodb-org/4.4/x86_64/
+              gpgcheck=1
+              enabled=1
+              gpgkey=https://www.mongodb.org/static/pgp/server-4.4.asc
+
+        - name: install mongodb
+          shell: |
+            dnf -y install mongodb-org
+            systemctl daemon-reload
+
+    - name: install wget, git, terminator
+      dnf:
+        name: 
+          - wget
+          - git
+          - terminator
+        state: latest
+
+    - name: install vagrant and virtualbox
+      shell: lscpu | grep Virtualization
+      register: virtualization_extension
+
+    - name: install VirtualBox
+      shell: |
+        wget http://download.virtualbox.org/virtualbox/rpm/fedora/virtualbox.repo
+        mv virtualbox.repo /etc/yum.repos.d/virtualbox.repo
+        dnf install -y VirtualBox*
+        /usr/lib/virtualbox/vboxdrv.sh setup 
+      when: virtualization_extension.stdout != ""
+
+    - name: install vagrant
+      shell: dnf -y install vagrant
+
+    - name: install nodejs
+      dnf:
+        name: nodejs
+        state: latest
+
+    - name: install java tools
+      dnf:
+        name: maven
+        state: latest
+
+    - name: install mysql
+      shell: | 
+        dnf -y install https://dev.mysql.com/get/mysql80-community-release-fc35-2.noarch.rpm
+        dnf -y install mysql-community-server
+
+    - name: install kubectl
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+    - name: install minikube
+      shell: |
+        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        install minikube-linux-amd64 /usr/local/bin/minikube
+
+    - name: generate ssh keypair
+      openssh_keypair:
+        path: /tmp/fedora_id_ed25519
+        size: 4096
+        type: ed25519
