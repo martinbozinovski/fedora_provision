@@ -4,6 +4,16 @@
   become: yes
 
   tasks:
+    - name: autoremove, update cache
+      block:
+        - name: autoremove preinstalled packages
+          dnf:
+            autoremove: yes
+
+        - name: force dnf to check if cache is out of date
+          dnf:
+            update_cache: yes
+
     - name: manage docker (remove if old, install latest)
       shell: | 
         dnf remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux \
@@ -85,3 +95,11 @@
         path: /tmp/fedora_id_ed25519
         size: 4096
         type: ed25519
+
+    - name: upgrade all packages
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: clean dnf packages
+      shell: dnf -y clean packages
